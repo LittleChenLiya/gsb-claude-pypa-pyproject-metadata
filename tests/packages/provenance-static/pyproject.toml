@@ -1,0 +1,13 @@
+# Fully static metadata: every field value is defined in [project].
+[build-system]
+requires = ["flit-core>=3.11"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "provenance-static"
+version = "1.0.0"
+description = "Fully static metadata, nothing pending from the backend"
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+docs = ["sphinx>=7"]

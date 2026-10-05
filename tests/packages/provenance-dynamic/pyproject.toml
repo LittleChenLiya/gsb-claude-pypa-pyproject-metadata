@@ -1,0 +1,10 @@
+# Legal dynamic version: declared in project.dynamic, value pending
+# from the build backend.
+[build-system]
+requires = ["flit-core>=3.11"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "provenance-dynamic"
+dynamic = ["version"]
+description = "Version is provided by the build backend"

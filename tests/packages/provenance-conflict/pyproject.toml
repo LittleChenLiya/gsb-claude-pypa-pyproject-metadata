@@ -1,0 +1,9 @@
+# Invalid: version is both statically defined and declared dynamic.
+[build-system]
+requires = ["flit-core>=3.11"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "provenance-conflict"
+version = "1.0.0"
+dynamic = ["version"]

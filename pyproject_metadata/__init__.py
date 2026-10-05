@@ -52,6 +52,12 @@ import warnings
 from . import constants, pyproject
 from .errors import ConfigurationError, ConfigurationWarning, ErrorCollector
 from .project_table import to_project_table
+from .provenance import (
+    FieldOrigin,
+    FieldProvenance,
+    FieldProvenancePlan,
+    build_provenance_plan,
+)
 from .pyproject import License, Readme
 
 if typing.TYPE_CHECKING:
@@ -81,11 +87,15 @@ __version__ = "0.12.1"
 
 __all__ = [
     "ConfigurationError",
+    "FieldOrigin",
+    "FieldProvenance",
+    "FieldProvenancePlan",
     "License",
     "RFC822Message",
     "RFC822Policy",
     "Readme",
     "StandardMetadata",
+    "build_provenance_plan",
     "extras_build_system",
     "extras_project",
     "extras_top_level",
