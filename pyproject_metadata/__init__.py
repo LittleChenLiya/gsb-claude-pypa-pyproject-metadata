@@ -53,6 +53,7 @@ from . import constants, pyproject
 from .errors import ConfigurationError, ConfigurationWarning, ErrorCollector
 from .project_table import to_project_table
 from .pyproject import License, Readme
+from .url_plan import URLPlan, URLPlanEntry, build_url_plan, canonical_url_label
 
 if typing.TYPE_CHECKING:
     from collections.abc import Generator, Mapping
@@ -86,6 +87,10 @@ __all__ = [
     "RFC822Policy",
     "Readme",
     "StandardMetadata",
+    "URLPlan",
+    "URLPlanEntry",
+    "build_url_plan",
+    "canonical_url_label",
     "extras_build_system",
     "extras_project",
     "extras_top_level",
@@ -581,6 +586,20 @@ class StandardMetadata:
         smart_message = _JSonMessageSetter(message)
         self._write_metadata(smart_message)
         return message
+
+    def url_plan(self) -> URLPlan:
+        """
+        Build an explicit URL plan for ``project.urls`` (see
+        :mod:`pyproject_metadata.url_plan`).
+
+        Labels are classified into well-known categories, but the original
+        labels and URLs are preserved for output. URLs are validated offline
+        (absolute URLs with a supported scheme only); duplicate canonical
+        labels with different addresses are reported as source conflicts. On
+        any failure an error is raised and no partial plan is returned.
+        Respects ``all_errors``.
+        """
+        return build_url_plan(self.urls, all_errors=self.all_errors)
 
     def validate(self, *, warn: bool = True) -> None:  # noqa: C901
         """
