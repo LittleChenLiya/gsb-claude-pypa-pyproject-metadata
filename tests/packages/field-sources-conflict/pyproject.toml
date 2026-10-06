@@ -1,0 +1,13 @@
+# Example 3: invalid - the same field uses both sources.
+# PEP 621 forbids listing a field in project.dynamic while also defining it
+# statically under [project]. The planner reports a static-dynamic-conflict
+# problem located at project.version (no exception is raised until finalize()).
+
+[build-system]
+requires = ["flit-core>=3.11"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "field-sources-conflict"
+version = "9.9.9"
+dynamic = ["version"]

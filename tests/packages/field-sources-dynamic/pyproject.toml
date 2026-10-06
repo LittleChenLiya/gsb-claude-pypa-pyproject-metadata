@@ -1,0 +1,14 @@
+# Example 2: a legal dynamic version.
+# "version" is listed in project.dynamic and has no static definition, so the
+# planner marks it as dynamic and pending the backend. The planner itself never
+# runs the backend (backend_hook_calls == 0); a real backend would fill the
+# value in before the metadata is written.
+
+[build-system]
+requires = ["flit-core>=3.11"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "field-sources-dynamic"
+dynamic = ["version"]
+description = "Version provided by the backend"

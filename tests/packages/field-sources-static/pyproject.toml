@@ -1,0 +1,21 @@
+# Example 1: every metadata field is statically defined.
+# The field-source planner plans all of [project] as "static"; no backend has
+# to provide anything, so backend_hook_calls stays 0.
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "field-sources-static"
+version = "1.2.3"
+description = "All fields statically defined"
+requires-python = ">=3.9"
+dependencies = ["packaging>=23.2"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+docs = ["sphinx>=7"]
+
+[project.urls]
+homepage = "https://example.com/field-sources-static"

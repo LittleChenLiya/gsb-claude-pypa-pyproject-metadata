@@ -33,3 +33,11 @@ pyproject\_metadata.project\_table module
    :members:
    :undoc-members:
    :show-inheritance:
+
+pyproject\_metadata.field\_sources module
+-----------------------------------------
+
+.. automodule:: pyproject_metadata.field_sources
+   :members:
+   :undoc-members:
+   :show-inheritance:

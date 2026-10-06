@@ -51,6 +51,14 @@ import warnings
 # Build backends may vendor this package, so all imports are relative.
 from . import constants, pyproject
 from .errors import ConfigurationError, ConfigurationWarning, ErrorCollector
+from .field_sources import (
+    FieldSource,
+    FieldSourcePlan,
+    FieldSourceProblem,
+    FieldSourceProblemKind,
+    PlannedField,
+    plan_field_sources,
+)
 from .project_table import to_project_table
 from .pyproject import License, Readme
 
@@ -81,7 +89,12 @@ __version__ = "0.12.1"
 
 __all__ = [
     "ConfigurationError",
+    "FieldSource",
+    "FieldSourcePlan",
+    "FieldSourceProblem",
+    "FieldSourceProblemKind",
     "License",
+    "PlannedField",
     "RFC822Message",
     "RFC822Policy",
     "Readme",
@@ -90,6 +103,7 @@ __all__ = [
     "extras_project",
     "extras_top_level",
     "field_to_metadata",
+    "plan_field_sources",
 ]
 
 

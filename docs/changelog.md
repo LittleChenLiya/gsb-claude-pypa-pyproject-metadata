@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+Features:
+
+- Add an explicit field-source planner (`pyproject_metadata.field_sources`)
+  that classifies every `[project]` field as statically defined, declared
+  dynamic (pending the backend), or backend-provided. A field cannot mix a
+  static definition with a `dynamic` declaration. The planner is pure data
+  analysis: it never executes a build backend or imports the described
+  project (`FieldSourcePlan.backend_hook_calls` is always `0`). Missing
+  required fields and unknown fields are reported separately, nested
+  `optional-dependencies` entries keep their spec path, and every report
+  entry preserves the input location and real field name.
+
 ## 0.12.1 (7-3-2026)
 
 Fixes:
