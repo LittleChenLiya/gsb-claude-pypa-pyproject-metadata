@@ -36,10 +36,10 @@ test = [
 ]
 
 [project.urls]
-homepage = 'example.com'
-documentation = 'readthedocs.org'
-repository = 'github.com/some/repo'
-changelog = 'github.com/some/repo/blob/master/CHANGELOG.rst'
+homepage = 'https://example.com'
+documentation = 'https://readthedocs.org'
+repository = 'https://github.com/some/repo'
+changelog = 'https://github.com/some/repo/blob/master/CHANGELOG.rst'
 
 [project.scripts]
 full-metadata = 'full_metadata:main_cli'

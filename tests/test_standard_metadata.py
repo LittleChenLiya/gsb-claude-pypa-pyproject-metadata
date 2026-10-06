@@ -620,7 +620,7 @@ def all_errors(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) 
                 name = "test"
                 version = "0.1.0"
                 [project.urls]
-                "I am really really too long for this place" = "url"
+                "I am really really too long for this place" = "https://example.com"
             """,
             "\"project.urls\" names cannot be more than 32 characters long (got 'I am really really too long for this place')",
             id="URL name too long",
@@ -1260,10 +1260,10 @@ def test_value(after_rfc: bool, monkeypatch: pytest.MonkeyPatch) -> None:
         "Programming Language :: Python",
     ]
     assert metadata.urls == {
-        "changelog": "github.com/some/repo/blob/master/CHANGELOG.rst",
-        "documentation": "readthedocs.org",
-        "homepage": "example.com",
-        "repository": "github.com/some/repo",
+        "changelog": "https://github.com/some/repo/blob/master/CHANGELOG.rst",
+        "documentation": "https://readthedocs.org",
+        "homepage": "https://example.com",
+        "repository": "https://github.com/some/repo",
     }
     assert metadata.entrypoints == {
         "custom": {
@@ -1375,10 +1375,10 @@ def test_as_json(monkeypatch: pytest.MonkeyPatch) -> None:
         "metadata_version": "2.1",
         "name": "full_metadata",
         "project_url": [
-            "homepage, example.com",
-            "documentation, readthedocs.org",
-            "repository, github.com/some/repo",
-            "changelog, github.com/some/repo/blob/master/CHANGELOG.rst",
+            "homepage, https://example.com",
+            "documentation, https://readthedocs.org",
+            "repository, https://github.com/some/repo",
+            "changelog, https://github.com/some/repo/blob/master/CHANGELOG.rst",
         ],
         "provides_extra": ["test"],
         "requires_dist": [
@@ -1430,10 +1430,10 @@ def test_as_rfc822(monkeypatch: pytest.MonkeyPatch) -> None:
         ("License", "some license text"),
         ("Classifier", "Development Status :: 4 - Beta"),
         ("Classifier", "Programming Language :: Python"),
-        ("Project-URL", "homepage, example.com"),
-        ("Project-URL", "documentation, readthedocs.org"),
-        ("Project-URL", "repository, github.com/some/repo"),
-        ("Project-URL", "changelog, github.com/some/repo/blob/master/CHANGELOG.rst"),
+        ("Project-URL", "homepage, https://example.com"),
+        ("Project-URL", "documentation, https://readthedocs.org"),
+        ("Project-URL", "repository, https://github.com/some/repo"),
+        ("Project-URL", "changelog, https://github.com/some/repo/blob/master/CHANGELOG.rst"),
         ("Requires-Python", ">=3.9"),
         ("Requires-Dist", "dependency1"),
         ("Requires-Dist", "dependency2>1.0.0"),

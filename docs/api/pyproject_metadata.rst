@@ -33,3 +33,11 @@ pyproject\_metadata.project\_table module
    :members:
    :undoc-members:
    :show-inheritance:
+
+pyproject\_metadata.urls module
+-------------------------------
+
+.. automodule:: pyproject_metadata.urls
+   :members:
+   :undoc-members:
+   :show-inheritance:

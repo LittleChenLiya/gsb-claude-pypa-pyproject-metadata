@@ -49,7 +49,7 @@ import typing
 import warnings
 
 # Build backends may vendor this package, so all imports are relative.
-from . import constants, pyproject
+from . import constants, pyproject, urls
 from .errors import ConfigurationError, ConfigurationWarning, ErrorCollector
 from .project_table import to_project_table
 from .pyproject import License, Readme
@@ -601,6 +601,9 @@ class StandardMetadata:
         - ``license`` is an SPDX license expression if metadata_version >= 2.4
         - ``license_files`` is supported only for metadata_version >= 2.4
         - ``project_url`` can't contain keys over 32 characters
+        - ``project_url`` values must be valid absolute URLs with a supported
+          scheme, and well-known labels mapping to the same category must not
+          give conflicting addresses (see :mod:`pyproject_metadata.urls`)
         - ``import-name(paces)s`` is only supported on metadata_version >= 2.5
         - ``import-name(space)s`` must be valid names, optionally with ``; private``
         - ``import-names`` and ``import-namespaces`` cannot overlap.
@@ -681,6 +684,8 @@ class StandardMetadata:
             if len(name) > 32:
                 msg = "{key} names cannot be more than 32 characters long"
                 errors.config_error(msg, key="project.urls", got=name)
+
+        urls.validate_project_urls(self.urls, errors=errors)
 
         if (
             self.import_names is not None

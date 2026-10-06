@@ -7,6 +7,7 @@
    :maxdepth: 2
 
 api/pyproject_metadata
+url-plan
 changelog
 ```
 

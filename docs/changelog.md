@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+Features:
+
+- Add an explicit parsing plan for `project.urls`
+  (`pyproject_metadata.urls`, see {doc}`url-plan`). Labels are classified
+  into well-known categories (e.g. `Homepage` and `主页` both map to
+  `homepage`); labels mapping to the same category with different
+  addresses are reported as conflicts, while identical addresses keep
+  both sources. URLs must be valid absolute URLs with a supported scheme
+  (`http`, `https`); unsupported schemes such as `mailto:` are rejected.
+  Original labels and URLs (including query strings and fragments) are
+  preserved for output, and validation is purely offline.
+
 ## 0.12.1 (7-3-2026)
 
 Fixes:
