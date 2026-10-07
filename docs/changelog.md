@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+Features:
+
+- Add an opt-in `resolve_license_files` parameter to
+  `StandardMetadata.from_pyproject`. When enabled, every file matched by
+  `project.license-files` is checked so that the final target of any symlink
+  chain cannot escape the project directory. The declared paths together with
+  their absolute real paths are returned on
+  `StandardMetadata.license_file_resolutions` (file contents are never read).
+  A failed boundary check aborts parsing, so no Core Metadata is produced.
+  The option defaults to off, preserving the original interface and
+  symlink-following policy.
+
 ## 0.12.1 (7-3-2026)
 
 Fixes:

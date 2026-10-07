@@ -52,7 +52,7 @@ import warnings
 from . import constants, pyproject
 from .errors import ConfigurationError, ConfigurationWarning, ErrorCollector
 from .project_table import to_project_table
-from .pyproject import License, Readme
+from .pyproject import License, Readme, ResolvedLicenseFile
 
 if typing.TYPE_CHECKING:
     from collections.abc import Generator, Mapping
@@ -85,6 +85,7 @@ __all__ = [
     "RFC822Message",
     "RFC822Policy",
     "Readme",
+    "ResolvedLicenseFile",
     "StandardMetadata",
     "extras_build_system",
     "extras_project",
@@ -314,6 +315,12 @@ class StandardMetadata:
     description: str | None = None
     license: License | str | None = None
     license_files: list[pathlib.Path] | None = None
+    license_file_resolutions: list[ResolvedLicenseFile] | None = None
+    """
+    Resolved real paths for ``project.license-files``. Only populated when
+    ``from_pyproject`` is called with ``resolve_license_files=True``; ``None``
+    otherwise (the default, non-following-compatible behavior).
+    """
     readme: Readme | None = None
     requires_python: packaging.specifiers.SpecifierSet | None = None
     dependencies: list[Requirement] = dataclasses.field(default_factory=list)
@@ -413,6 +420,7 @@ class StandardMetadata:
         *,
         allow_extra_keys: bool | None = None,
         all_errors: bool = False,
+        resolve_license_files: bool = False,
     ) -> Self:
         """
         Read metadata from a pyproject.toml table. This is the main method for
@@ -420,6 +428,16 @@ class StandardMetadata:
         fields: ``allow_extra_keys`` to control what happens when extra keys are
         present in the pyproject table, and ``all_errors``, to  raise all errors
         in an ExceptionGroup instead of raising the first one.
+
+        When ``resolve_license_files`` is enabled, every file matched by
+        ``project.license-files`` is checked so that the final target of any
+        symlink chain cannot escape the project directory. The declared
+        (relative) paths together with their absolute real paths are then
+        available on ``metadata.license_file_resolutions``; file contents are
+        never read. A failed boundary check aborts parsing, so no
+        ``StandardMetadata`` (and therefore no Core Metadata) is produced. The
+        option defaults to ``False`` and leaves the original interface and
+        symlink-following policy unchanged.
         """
         error_collector = ErrorCollector(collect_errors=all_errors)
         if "project" not in data:
@@ -523,9 +541,17 @@ class StandardMetadata:
         authors = pyproject.ensure_people(project.get("authors", []))
         maintainers = pyproject.ensure_people(project.get("maintainers", []))
         license = pyproject.get_license(project, project_dir, error_collector)
-        license_files = pyproject.get_license_files(
-            project, project_dir, error_collector
+        license_files_result = pyproject.get_license_files(
+            project,
+            project_dir,
+            error_collector,
+            resolve=resolve_license_files,
         )
+        if license_files_result is None:
+            license_files = None
+            license_file_resolutions = None
+        else:
+            license_files, license_file_resolutions = license_files_result
         readme = pyproject.get_readme(project, project_dir, error_collector)
         dependencies = pyproject.get_dependencies(project)
         optional_dependencies = pyproject.get_optional_dependencies(project)
@@ -539,6 +565,7 @@ class StandardMetadata:
                 description=description,
                 license=license,
                 license_files=license_files,
+                license_file_resolutions=license_file_resolutions,
                 readme=readme,
                 requires_python=requires_python,
                 dependencies=dependencies,

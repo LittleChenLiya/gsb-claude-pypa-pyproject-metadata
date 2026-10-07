@@ -30,6 +30,7 @@ if typing.TYPE_CHECKING:
 __all__ = [
     "License",
     "Readme",
+    "ResolvedLicenseFile",
 ]
 
 
@@ -58,6 +59,22 @@ class Readme:
     text: str
     file: pathlib.Path | None
     content_type: str
+
+
+@dataclasses.dataclass(frozen=True)
+class ResolvedLicenseFile:
+    """
+    A license file matched by ``project.license-files`` together with the real
+    location of its final symlink target.
+
+    ``declared`` is the path as matched by the glob, relative to the project
+    directory. ``resolved`` is the absolute, fully resolved real path of the
+    file's final symlink target. File contents are never read when producing
+    these objects.
+    """
+
+    declared: pathlib.Path
+    resolved: pathlib.Path
 
 
 def ensure_str(value: object) -> str | None:
@@ -145,12 +162,24 @@ def get_license(
 
 
 def get_license_files(
-    project: ProjectTable, project_dir: pathlib.Path, error_collector: ErrorCollector
-) -> list[pathlib.Path] | None:
+    project: ProjectTable,
+    project_dir: pathlib.Path,
+    error_collector: ErrorCollector,
+    *,
+    resolve: bool = False,
+) -> tuple[list[pathlib.Path], list[ResolvedLicenseFile] | None] | None:
     """Get the license-files list of files from the project table.
 
-    Returns None if an error occurred (including invalid globs, etc) or if
-    not present.
+    Returns None if the ``license-files`` field is not present or has an
+    invalid type. Otherwise returns a pair: the declared paths (relative to
+    the project directory) and, when ``resolve=True``, a list pairing each
+    declared path with its absolute resolved real path; the second element
+    is None when ``resolve=False``.
+
+    With ``resolve=True``, each expanded glob match is additionally checked
+    against the project root: the final target of any symlink chain must not
+    escape the project directory. File contents are never read. Matches that
+    escape the root are reported as errors and omitted.
     """
     license_files = project.get("license-files")
     if license_files is None:
@@ -158,7 +187,16 @@ def get_license_files(
     if ensure_list(license_files) is None:
         return None
 
-    return list(_get_files_from_globs(project_dir, license_files, error_collector))
+    matches = list(
+        _get_files_from_globs(
+            project_dir, license_files, error_collector, resolve=resolve
+        )
+    )
+    if resolve:
+        resolved = [typing.cast("ResolvedLicenseFile", m) for m in matches]
+        declared = [m.declared for m in resolved]
+        return declared, resolved
+    return [typing.cast("pathlib.Path", m) for m in matches], None
 
 
 def get_readme(  # noqa: C901
@@ -303,9 +341,24 @@ def get_dynamic(project: dict[str, Any]) -> list[str]:
 
 
 def _get_files_from_globs(
-    project_dir: pathlib.Path, globs: Iterable[str], error_collector: ErrorCollector
-) -> Generator[pathlib.Path, None, None]:
-    """Given a list of globs, get files that match."""
+    project_dir: pathlib.Path,
+    globs: Iterable[str],
+    error_collector: ErrorCollector,
+    *,
+    resolve: bool = False,
+) -> Generator[pathlib.Path | ResolvedLicenseFile, None, None]:
+    """Given a list of globs, get files that match.
+
+    With ``resolve=False`` (default), yields paths relative to the project
+    directory, preserving the original symlink-following policy.
+
+    With ``resolve=True``, yields :class:`ResolvedLicenseFile` instances
+    instead. Each glob match is checked so that its fully resolved symlink
+    target stays inside the project root; matches that escape the root are
+    reported and skipped, so no result pointing outside the project root is
+    ever yielded. File contents are not read.
+    """
+    resolved_root = project_dir.resolve()
     for glob in globs:
         # Reject any glob that escapes the project directory: absolute paths
         # (POSIX or Windows) or any pattern containing a ".." path segment.
@@ -325,4 +378,40 @@ def _get_files_from_globs(
             error_collector.config_error(msg, key="project.license-files", glob=glob)
             continue
         for f in files:
-            yield f.relative_to(project_dir)
+            declared = f.relative_to(project_dir)
+            if resolve:
+                resolved = _resolve_path(f)
+                if not _is_within_root(resolved, resolved_root):
+                    msg = (
+                        "{key} entry {declared!r} resolves to {resolved!r}, "
+                        "which is outside the project directory {root!r}"
+                    )
+                    error_collector.config_error(
+                        msg,
+                        key="project.license-files",
+                        declared=declared.as_posix(),
+                        resolved=str(resolved),
+                        root=str(resolved_root),
+                    )
+                    continue
+                yield ResolvedLicenseFile(declared=declared, resolved=resolved)
+            else:
+                yield declared
+
+
+def _resolve_path(path: pathlib.Path) -> pathlib.Path:
+    """Return the absolute, fully resolved (symlink-expanded) path.
+
+    Kept as a tiny seam so callers/tests on platforms without permission to
+    create symlinks can exercise the root-boundary logic with a fixture.
+    """
+    return path.resolve()
+
+
+def _is_within_root(path: pathlib.Path, root: pathlib.Path) -> bool:
+    """Check that an absolute, resolved ``path`` is equal to or inside ``root``."""
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
