@@ -90,6 +90,8 @@ __all__ = [
     "extras_project",
     "extras_top_level",
     "field_to_metadata",
+    "keywords_from_metadata",
+    "keywords_to_metadata",
 ]
 
 
@@ -126,6 +128,41 @@ def extras_project(pyproject_table: Mapping[str, Any]) -> set[str]:
     Return any extra keys in the project table.
     """
     return set(pyproject_table.get("project", [])) - constants.KNOWN_PROJECT_FIELDS
+
+
+def keywords_to_metadata(keywords: list[str] | None) -> str | None:
+    """
+    Convert a ``project.keywords`` list to the Core Metadata ``Keywords``
+    field, a comma-separated string.
+
+    An unset field (``None``) and an empty list are kept distinct: ``None``
+    round-trips to ``None``, while an empty list produces an empty string.
+
+    A keyword containing a comma is rejected, since it would be split into
+    two keywords when the metadata is read back, making the round trip
+    irreversible.
+    """
+    if keywords is None:
+        return None
+    errors = ErrorCollector(collect_errors=False)
+    for kw in keywords:
+        if "," in kw:
+            msg = "Field {key} cannot contain a comma, as it would not round-trip through Core Metadata"
+            errors.config_error(msg, key="project.keywords", got=kw)
+    return ",".join(keywords)
+
+
+def keywords_from_metadata(value: str | None) -> list[str] | None:
+    """
+    Convert the Core Metadata ``Keywords`` field back to a
+    ``project.keywords`` list.
+
+    This is the inverse of :func:`keywords_to_metadata`: ``None`` stays
+    ``None`` and an empty string becomes an empty list.
+    """
+    if value is None:
+        return None
+    return [kw.strip() for kw in value.split(",") if kw.strip()]
 
 
 @dataclasses.dataclass
@@ -165,8 +202,9 @@ class _JSonMessageSetter:
             return
 
         if name == "keywords":
-            values = (x.strip() for x in value.split(","))
-            self.data[key] = [x for x in values if x]
+            keywords = keywords_from_metadata(value)
+            assert keywords is not None
+            self.data[key] = keywords
         elif name in constants.KNOWN_MULTIUSE:
             entry = self.data.setdefault(key, [])
             assert isinstance(entry, list)
@@ -744,7 +782,7 @@ class StandardMetadata:
         # skip 'Supported-Platform'
         if self.description:
             smart_message["Summary"] = self.description
-        smart_message["Keywords"] = ",".join(self.keywords) or None
+        smart_message["Keywords"] = keywords_to_metadata(self.keywords) or None
         # skip 'Home-page'
         # skip 'Download-URL'
         smart_message["Author"] = _name_list(self.authors)
