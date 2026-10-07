@@ -90,6 +90,8 @@ __all__ = [
     "extras_project",
     "extras_top_level",
     "field_to_metadata",
+    "keywords_from_metadata",
+    "keywords_to_metadata",
 ]
 
 
@@ -126,6 +128,43 @@ def extras_project(pyproject_table: Mapping[str, Any]) -> set[str]:
     Return any extra keys in the project table.
     """
     return set(pyproject_table.get("project", [])) - constants.KNOWN_PROJECT_FIELDS
+
+
+def keywords_to_metadata(keywords: list[str] | None) -> str | None:
+    """
+    Convert a ``project.keywords`` array to the Core Metadata ``Keywords``
+    field, a comma-separated string.
+
+    ``None`` (field not set) converts to ``None``, while an empty list
+    converts to an empty string, so the two stay distinguishable. A keyword
+    containing a comma is rejected, since it could not be split back
+    unambiguously on the way in.
+    """
+    if keywords is None:
+        return None
+    for keyword in keywords:
+        # Non-string items are reported by the type validation instead
+        if isinstance(keyword, str) and "," in keyword:
+            msg = (
+                'Field "project.keywords" cannot contain a comma, as it would '
+                'not round-trip through the "Keywords" metadata field '
+                f"(got {keyword!r})"
+            )
+            raise ConfigurationError(msg, key="project.keywords")
+    return ",".join(keywords)
+
+
+def keywords_from_metadata(value: str | None) -> list[str] | None:
+    """
+    Convert the Core Metadata ``Keywords`` field back to a
+    ``project.keywords`` array.
+
+    ``None`` (field not set) converts to ``None``, while an empty string
+    converts to an empty list, so the two stay distinguishable.
+    """
+    if value is None:
+        return None
+    return [keyword.strip() for keyword in value.split(",") if keyword.strip()]
 
 
 @dataclasses.dataclass
@@ -604,6 +643,8 @@ class StandardMetadata:
         - ``import-name(paces)s`` is only supported on metadata_version >= 2.5
         - ``import-name(space)s`` must be valid names, optionally with ``; private``
         - ``import-names`` and ``import-namespaces`` cannot overlap.
+        - ``keywords`` entries can't contain commas, as they would not
+          round-trip through the Core Metadata ``Keywords`` field
         - A field that is both static and dynamic metadata requires metadata_version >= 2.6
         """
         errors = ErrorCollector(collect_errors=self.all_errors)
@@ -620,6 +661,15 @@ class StandardMetadata:
                 "numbers, period, underscore and hyphen. It must start and end with a letter or number"
             )
             errors.config_error(msg, key="project.name", name=self.name)
+
+        for keyword in self.keywords:
+            # Non-string items are reported by the type validation instead
+            if isinstance(keyword, str) and "," in keyword:
+                msg = (
+                    "Field {key} cannot contain a comma, as it would not "
+                    'round-trip through the "Keywords" metadata field'
+                )
+                errors.config_error(msg, key="project.keywords", got=keyword)
 
         if self.license_files is not None and isinstance(self.license, License):
             msg = '{key} must not be used when "project.license" is not a SPDX license expression'
@@ -744,7 +794,7 @@ class StandardMetadata:
         # skip 'Supported-Platform'
         if self.description:
             smart_message["Summary"] = self.description
-        smart_message["Keywords"] = ",".join(self.keywords) or None
+        smart_message["Keywords"] = keywords_to_metadata(self.keywords) or None
         # skip 'Home-page'
         # skip 'Download-URL'
         smart_message["Author"] = _name_list(self.authors)

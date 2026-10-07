@@ -2299,3 +2299,73 @@ def test_invalid_extra_name_warns_once_and_still_emitted() -> None:
     # Emitting metadata must not warn again (filterwarnings=error would raise),
     # and the extra is not dropped.
     assert "Provides-Extra: my extra" in str(metadata.as_rfc822())
+
+
+def test_keywords_metadata_roundtrip() -> None:
+    # project array -> Core Metadata field -> project array
+    keywords = ["alpha", "beta", "gamma"]
+    field = pyproject_metadata.keywords_to_metadata(keywords)
+    assert field == "alpha,beta,gamma"
+    assert pyproject_metadata.keywords_from_metadata(field) == keywords
+
+
+def test_keywords_metadata_empty_list_vs_unset() -> None:
+    # An empty list and an unset field stay distinguishable in both directions
+    assert pyproject_metadata.keywords_to_metadata([]) == ""
+    assert pyproject_metadata.keywords_to_metadata(None) is None
+    assert pyproject_metadata.keywords_from_metadata("") == []
+    assert pyproject_metadata.keywords_from_metadata(None) is None
+
+
+def test_keywords_metadata_comma_rejected() -> None:
+    # A keyword with a comma would be split irreversibly, so it is rejected
+    with pytest.raises(
+        pyproject_metadata.ConfigurationError,
+        match=re.escape(
+            'Field "project.keywords" cannot contain a comma, as it would not '
+            'round-trip through the "Keywords" metadata field (got \'a,b\')'
+        ),
+    ):
+        pyproject_metadata.keywords_to_metadata(["a,b"])
+
+
+def test_keywords_comma_no_partial_metadata() -> None:
+    # Invalid keywords must not produce a half-written metadata message
+    metadata = pyproject_metadata.StandardMetadata(
+        name="example",
+        version=packaging.version.Version("1.0"),
+        keywords=["ok"],
+    )
+    metadata.keywords = ["not,ok"]
+    with pytest.raises(
+        pyproject_metadata.ConfigurationError,
+        match=re.escape('Field "project.keywords" cannot contain a comma'),
+    ):
+        metadata.as_rfc822()
+    with pytest.raises(
+        pyproject_metadata.ConfigurationError,
+        match=re.escape('Field "project.keywords" cannot contain a comma'),
+    ):
+        metadata.as_json()
+
+
+def test_keywords_rfc822_matches_helper() -> None:
+    # Regression: the classic RFC822/JSON interfaces agree with the helpers
+    metadata = pyproject_metadata.StandardMetadata.from_pyproject(
+        {
+            "project": {
+                "name": "example",
+                "version": "1.0",
+                "keywords": ["alpha", "beta"],
+            }
+        }
+    )
+    message = metadata.as_rfc822()
+    assert message["Keywords"] == pyproject_metadata.keywords_to_metadata(
+        ["alpha", "beta"]
+    )
+    assert pyproject_metadata.keywords_from_metadata(message["Keywords"]) == [
+        "alpha",
+        "beta",
+    ]
+    assert metadata.as_json()["keywords"] == ["alpha", "beta"]
