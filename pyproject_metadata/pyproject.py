@@ -14,7 +14,7 @@ from __future__ import annotations
 import dataclasses
 import pathlib
 import typing
-from typing import Any
+from typing import Any, Literal, overload
 
 import packaging.requirements
 
@@ -29,12 +29,23 @@ if typing.TYPE_CHECKING:
 
 __all__ = [
     "License",
+    "LicenseFile",
     "Readme",
 ]
 
 
 def __dir__() -> list[str]:
     return __all__
+
+
+def _resolve_real_path(path: pathlib.Path) -> pathlib.Path:
+    """Resolve a path to its final target, following all symlinks.
+
+    This is a module-level function so that platforms without permission to
+    create symbolic links (e.g. standard Windows accounts) can substitute it
+    with a fixture in tests.
+    """
+    return path.resolve(strict=False)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -46,6 +57,19 @@ class License:
 
     text: str
     file: pathlib.Path | None
+
+
+@dataclasses.dataclass(frozen=True)
+class LicenseFile:
+    """
+    This represents an expanded ``project.license-files`` entry when the
+    real-path check is enabled. It records both the declared path (the glob
+    result, kept relative to the project directory) and the actual final path
+    after all symbolic links have been resolved. File contents are never read.
+    """
+
+    declared: pathlib.Path
+    resolved: pathlib.Path
 
 
 @dataclasses.dataclass(frozen=True)
@@ -144,13 +168,43 @@ def get_license(
     return License(text, file)
 
 
+@overload
 def get_license_files(
-    project: ProjectTable, project_dir: pathlib.Path, error_collector: ErrorCollector
-) -> list[pathlib.Path] | None:
+    project: ProjectTable,
+    project_dir: pathlib.Path,
+    error_collector: ErrorCollector,
+    *,
+    resolve_links: Literal[True],
+) -> list[LicenseFile] | None: ...
+
+
+@overload
+def get_license_files(
+    project: ProjectTable,
+    project_dir: pathlib.Path,
+    error_collector: ErrorCollector,
+    *,
+    resolve_links: Literal[False] = False,
+) -> list[pathlib.Path] | None: ...
+
+
+def get_license_files(
+    project: ProjectTable,
+    project_dir: pathlib.Path,
+    error_collector: ErrorCollector,
+    *,
+    resolve_links: bool = False,
+) -> list[LicenseFile] | list[pathlib.Path] | None:
     """Get the license-files list of files from the project table.
 
     Returns None if an error occurred (including invalid globs, etc) or if
     not present.
+
+    When ``resolve_links`` is True, each expanded glob result is resolved to
+    its final target and the result is checked to stay within the project
+    directory; :class:`LicenseFile` entries carrying both the declared and the
+    resolved paths are returned instead of bare paths. File contents are never
+    read.
     """
     license_files = project.get("license-files")
     if license_files is None:
@@ -158,7 +212,14 @@ def get_license_files(
     if ensure_list(license_files) is None:
         return None
 
-    return list(_get_files_from_globs(project_dir, license_files, error_collector))
+    return typing.cast(
+        "list[LicenseFile] | list[pathlib.Path] | None",
+        list(
+            _get_files_from_globs(
+                project_dir, license_files, error_collector, resolve_links=resolve_links
+            )
+        ),
+    )
 
 
 def get_readme(  # noqa: C901
@@ -303,9 +364,20 @@ def get_dynamic(project: dict[str, Any]) -> list[str]:
 
 
 def _get_files_from_globs(
-    project_dir: pathlib.Path, globs: Iterable[str], error_collector: ErrorCollector
-) -> Generator[pathlib.Path, None, None]:
-    """Given a list of globs, get files that match."""
+    project_dir: pathlib.Path,
+    globs: Iterable[str],
+    error_collector: ErrorCollector,
+    *,
+    resolve_links: bool = False,
+) -> Generator[LicenseFile | pathlib.Path, None, None]:
+    """Given a list of globs, get files that match.
+
+    When ``resolve_links`` is True, each expanded result is resolved to its
+    final target (following symbolic links) and verified not to escape the
+    project directory. Escaping results are reported as configuration errors
+    (thus no metadata can be produced from them) instead of yielded.
+    """
+    real_project_dir = _resolve_real_path(project_dir)
     for glob in globs:
         # Reject any glob that escapes the project directory: absolute paths
         # (POSIX or Windows) or any pattern containing a ".." path segment.
@@ -325,4 +397,21 @@ def _get_files_from_globs(
             error_collector.config_error(msg, key="project.license-files", glob=glob)
             continue
         for f in files:
-            yield f.relative_to(project_dir)
+            declared = f.relative_to(project_dir)
+            if not resolve_links:
+                yield declared
+                continue
+            real_path = _resolve_real_path(f)
+            if not real_path.is_relative_to(real_project_dir):
+                msg = (
+                    "{key} entry {declared!r} resolves outside of the project "
+                    "directory: {resolved!r}"
+                )
+                error_collector.config_error(
+                    msg,
+                    key="project.license-files",
+                    declared=str(declared),
+                    resolved=str(real_path),
+                )
+                continue
+            yield LicenseFile(declared, real_path)

@@ -52,7 +52,7 @@ import warnings
 from . import constants, pyproject
 from .errors import ConfigurationError, ConfigurationWarning, ErrorCollector
 from .project_table import to_project_table
-from .pyproject import License, Readme
+from .pyproject import License, LicenseFile, Readme
 
 if typing.TYPE_CHECKING:
     from collections.abc import Generator, Mapping
@@ -82,6 +82,7 @@ __version__ = "0.12.1"
 __all__ = [
     "ConfigurationError",
     "License",
+    "LicenseFile",
     "RFC822Message",
     "RFC822Policy",
     "Readme",
@@ -314,6 +315,7 @@ class StandardMetadata:
     description: str | None = None
     license: License | str | None = None
     license_files: list[pathlib.Path] | None = None
+    resolved_license_files: list[LicenseFile] | None = None
     readme: Readme | None = None
     requires_python: packaging.specifiers.SpecifierSet | None = None
     dependencies: list[Requirement] = dataclasses.field(default_factory=list)
@@ -413,6 +415,7 @@ class StandardMetadata:
         *,
         allow_extra_keys: bool | None = None,
         all_errors: bool = False,
+        resolve_license_files: bool = False,
     ) -> Self:
         """
         Read metadata from a pyproject.toml table. This is the main method for
@@ -420,6 +423,13 @@ class StandardMetadata:
         fields: ``allow_extra_keys`` to control what happens when extra keys are
         present in the pyproject table, and ``all_errors``, to  raise all errors
         in an ExceptionGroup instead of raising the first one.
+
+        When ``resolve_license_files`` is True, every expanded
+        ``project.license-files`` entry is resolved to its final target
+        (following symbolic links) and checked not to escape ``project_dir``;
+        the declared/resolved path pairs are available as
+        :attr:`resolved_license_files`. The default is False, preserving the
+        historical behavior of not following links.
         """
         error_collector = ErrorCollector(collect_errors=all_errors)
         if "project" not in data:
@@ -523,9 +533,20 @@ class StandardMetadata:
         authors = pyproject.ensure_people(project.get("authors", []))
         maintainers = pyproject.ensure_people(project.get("maintainers", []))
         license = pyproject.get_license(project, project_dir, error_collector)
-        license_files = pyproject.get_license_files(
-            project, project_dir, error_collector
-        )
+        if resolve_license_files:
+            resolved_license_files = pyproject.get_license_files(
+                project, project_dir, error_collector, resolve_links=True
+            )
+            license_files = (
+                [f.declared for f in resolved_license_files]
+                if resolved_license_files is not None
+                else None
+            )
+        else:
+            license_files = pyproject.get_license_files(
+                project, project_dir, error_collector
+            )
+            resolved_license_files = None
         readme = pyproject.get_readme(project, project_dir, error_collector)
         dependencies = pyproject.get_dependencies(project)
         optional_dependencies = pyproject.get_optional_dependencies(project)
@@ -539,6 +560,7 @@ class StandardMetadata:
                 description=description,
                 license=license,
                 license_files=license_files,
+                resolved_license_files=resolved_license_files,
                 readme=readme,
                 requires_python=requires_python,
                 dependencies=dependencies,

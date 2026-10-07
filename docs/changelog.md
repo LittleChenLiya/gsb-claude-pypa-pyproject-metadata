@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+Features:
+
+- Add an opt-in `resolve_license_files` parameter to
+  `StandardMetadata.from_pyproject`. When enabled, every expanded
+  `project.license-files` glob result is resolved to its final target
+  (following symbolic links) and checked to stay within the project
+  directory; an escaping entry is a configuration error, so no partial Core
+  Metadata is produced. The declared and resolved path pairs are exposed as
+  `StandardMetadata.resolved_license_files` (`LicenseFile`). File contents
+  are never read. The option defaults to off, preserving the previous
+  non-following behavior.
+
 ## 0.12.1 (7-3-2026)
 
 Fixes:
